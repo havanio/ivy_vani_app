@@ -114,7 +114,7 @@ async function addItem() {
     }
 }
 
-// 6. Hiển thị dữ liệu lên giao diện
+// 6. Hiển thị dữ liệu lên giao diện (SỬA LỖI ĐỊNH DẠNG NGÀY HIỂN THỊ)
 function renderData() {
     const list = document.getElementById('historyList');
     const filterMonth = document.getElementById('monthFilter').value; // Dạng YYYY-MM
@@ -124,10 +124,16 @@ function renderData() {
     let totalVani = 0;
     let totalIvy = 0;
 
-    // Lọc theo tháng (xử lý cả dấu - và /)
+    // Lọc theo tháng
     const filteredData = transactions.filter(item => {
         if (!item.date) return false;
-        const itemMonth = item.date.substring(0, 7).replace(/\//g, '-');
+        // Chuẩn hóa định dạng ngày để lọc tháng chính xác
+        const dateObj = new Date(item.date);
+        if (isNaN(dateObj)) return false;
+        
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const itemMonth = `${year}-${month}`;
         return itemMonth === filterMonth;
     });
 
@@ -137,17 +143,29 @@ function renderData() {
         if (item.payer === 'Vani') totalVani += item.amount;
         else totalIvy += item.amount;
 
-        // Định dạng ngày hiển thị dd/mm/yyyy
-        const d = new Date(item.date.replace(/-/g, '/'));
-        const displayDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+        // --- PHẦN SỬA LỖI HIỂN THỊ NGÀY ---
+        let displayDate = "";
+        try {
+            const dateObj = new Date(item.date);
+            // Kiểm tra nếu ngày hợp lệ
+            if (!isNaN(dateObj)) {
+                const d = String(dateObj.getDate()).padStart(2, '0');
+                const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const y = dateObj.getFullYear();
+                displayDate = `${d}/${m}/${y}`;
+            } else {
+                displayDate = "N/A"; // Trường hợp không đọc được ngày
+            }
+        } catch (e) {
+            displayDate = "N/A";
+        }
 
         const li = document.createElement('li');
         li.innerHTML = `
             <span>
                 <small class="date-label">[${displayDate}]</small> 
                 <b>${item.payer}</b>: ${item.description} 
-                <span class="cat-tag">${item.category}</span>
-            </span>
+                </span>
             <span class="amt">${item.amount.toLocaleString('vi-VN')}đ</span>
         `;
         list.appendChild(li);
