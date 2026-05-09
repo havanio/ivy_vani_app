@@ -1,0 +1,32 @@
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding: 20px; }
+.container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 95%; max-width: 900px; }
+h2 { text-align: center; color: #333; margin-bottom: 30px; }
+
+/* Chia cột */
+.main-layout { display: flex; gap: 30px; align-items: flex-start; }
+.left-col { flex: 1.2; }
+.right-col { flex: 0.8; position: sticky; top: 20px; }
+
+.input-section { background: #f9f9f9; padding: 20px; border-radius: 10px; border: 1px solid #eee; }
+.input-section h3, .summary-card h3 { margin-top: 0; font-size: 18px; color: #555; }
+
+select, input { width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
+button { width: 100%; padding: 12px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }
+
+/* Bảng tổng kết */
+.summary-card { background: #fff; padding: 20px; border-radius: 12px; border: 2px solid #eef0f2; }
+.summary-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.summary-table td { padding: 12px 0; border-bottom: 1px solid #eee; font-size: 15px; }
+.bold { font-weight: bold; color: #333; }
+.highlight-row { text-align: center; font-weight: bold; border-bottom: none !important; }
+#balanceStatus { padding-top: 20px; font-size: 17px; }
+
+/* Danh sách lịch sử */
+ul { list-style: none; padding: 0; margin-top: 20px; }
+li { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #f0f0f0; }
+.amt { font-weight: bold; color: #444; }
+
+@media (max-width: 768px) {
+    .main-layout { flex-direction: column; }
+    .right-col { position: static; width: 100%; }
+}

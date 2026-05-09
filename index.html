@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Chi Tiêu Vani & Ivy</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h2>💰 Quản Lý Chi Tiêu Vani & Ivy</h2>
+        
+        <div class="main-layout">
+            <div class="left-col">
+                <div class="input-section">
+                    <h3>Nhập chi tiêu mới</h3>
+                    <select id="payer">
+                        <option value="Vani">Vani thanh toán</option>
+                        <option value="Ivy">Ivy thanh toán</option>
+                    </select>
+                    <select id="category">
+                        <option value="Ăn uống">Ăn uống</option>
+                        <option value="Mèo">Mèo</option>
+                        <option value="Xăng xe">Xăng xe</option>
+                        <option value="Thiết yếu">Thiết yếu</option>
+                        <option value="Cố định">Cố định</option>
+                        <option value="Ăn ngoài">Ăn ngoài</option>
+                        <option value="Khác">Khác</option>
+                    </select>
+                    <input type="text" id="description" placeholder="Nội dung chi tiêu">
+                    <input type="number" id="amount" placeholder="Số tiền (VNĐ)">
+                    <input type="date" id="date">
+                    <button onclick="addItem()">Ghi nhận</button>
+                </div>
+            </div>
+
+            <div class="right-col">
+                <div class="summary-card">
+                    <h3>Báo cáo chi tiêu</h3>
+                    <div class="filter-section">
+                        <label>Chọn tháng:</label>
+                        <select id="monthFilter" onchange="renderData()"></select>
+                    </div>
+                    
+                    <table class="summary-table">
+                        <tr>
+                            <td>Tổng chi tiêu tháng:</td>
+                            <td id="grandTotal" class="bold">0</td>
+                        </tr>
+                        <tr>
+                            <td>Vani đã chi:</td>
+                            <td id="vaniTotal">0</td>
+                        </tr>
+                        <tr>
+                            <td>Ivy đã chi:</td>
+                            <td id="ivyTotal">0</td>
+                        </tr>
+                        <tr class="highlight-row">
+                            <td colspan="2" id="balanceStatus">Đang hòa nhau</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <hr>
+        <h3>Lịch sử chi tiêu</h3>
+        <ul id="historyList"></ul>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
