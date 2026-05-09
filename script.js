@@ -4,8 +4,8 @@ const CATEGORY_BUDGETS = {
     "Xăng xe": 200000,
     "Thiết yếu": 300000,
     "Cố định": 4000000,
-    "Ăn ngoài": 2000000,
-    "Khác": 1000000
+    "Ăn ngoài": 1000000,
+    "Khác": 2000000
 };const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwgbYI51EUJDgjw8-f1oP6K7h_0zIHaPRPFmpV7GI6S88QrDO8rS25uasnSgoJOPPo/exec";
 
 let transactions = [];
