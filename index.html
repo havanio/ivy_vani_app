@@ -9,7 +9,7 @@
 <body>
 
     <div class="container">
-        <h2>💰 Quản Lý Chi Tiêu Vani & Ivy</h2>
+        <h2>Quản Lý Chi Tiêu Vani & Ivy</h2>
 
         <div class="main-layout">
 
@@ -48,18 +48,18 @@
 
                     <input type="date" id="date">
 
-                    <button id="submitBtn" onclick="addItem()">Ghi nhận</button>
+                    <button id="submitBtn" type="button">Ghi nhận</button>
                 </div>
 
             </div>
 
             <!-- RIGHT -->
-            <div class="budget-card">
-    <h3>📊 Báo cáo danh mục</h3>
+            <div class="right-col">
+                <div class="budget-card">
+                    <h3>Báo cáo danh mục</h3>
 
-    <div id="budgetList"></div>
-</div>
-<div class="right-col">
+                    <div id="budgetList"></div>
+                </div>
 
                 <div class="summary-card">
                     <h3>Báo cáo chi tiêu</h3>
@@ -67,7 +67,7 @@
                     <div class="filter-section">
                         <label>Chọn tháng:</label>
 
-                        <select id="monthFilter" onchange="renderData()"></select>
+                        <select id="monthFilter"></select>
                     </div>
 
                     <table class="summary-table">

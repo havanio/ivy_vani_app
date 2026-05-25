@@ -12,11 +12,13 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwgbYI51EUJDgjw8-f1
 
 let transactions = [];
 
-// 1. Tự động đặt ngày hôm nay (giờ địa phương)
-document.getElementById('date').valueAsDate = new Date();
-
-// 2. Định dạng tiền tệ realtime
 const amountInput = document.getElementById('amount');
+const dateInput = document.getElementById('date');
+const monthFilter = document.getElementById('monthFilter');
+const submitBtn = document.getElementById('submitBtn');
+
+dateInput.valueAsDate = new Date();
+
 amountInput.addEventListener('input', function (e) {
     let value = e.target.value.replace(/\D/g, '');
     if (value === '') {
@@ -26,10 +28,66 @@ amountInput.addEventListener('input', function (e) {
     e.target.value = Number(value).toLocaleString('vi-VN');
 });
 
-// 3. Tải dữ liệu từ Google Sheets
+monthFilter.addEventListener('change', renderData);
+submitBtn.addEventListener('click', addItem);
+
+function formatCurrency(amount) {
+    return Math.round(amount).toLocaleString('vi-VN') + 'đ';
+}
+
+function normalizeAmount(value) {
+    if (typeof value === 'number') return value;
+    return Number(String(value).replace(/[^\d]/g, '')) || 0;
+}
+
+function parseLocalDate(value) {
+    if (!value) return null;
+
+    const normalized = String(value).trim();
+    const dateParts = normalized.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+
+    if (dateParts) {
+        const [, year, month, day] = dateParts.map(Number);
+        return new Date(year, month - 1, day);
+    }
+
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function getMonthKey(value) {
+    const date = parseLocalDate(value);
+    if (!date) return '';
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+}
+
+function formatDisplayDate(value) {
+    const date = parseLocalDate(value);
+    if (!date) return 'N/A';
+
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${day}/${month}/${date.getFullYear()}`;
+}
+
+function createTextElement(tag, text, className) {
+    const element = document.createElement(tag);
+    element.textContent = text;
+    if (className) element.className = className;
+    return element;
+}
+
 async function loadDataFromSheets() {
+    generateMonthOptions();
+    renderData();
+
     try {
         const response = await fetch(SCRIPT_URL);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
         transactions = await response.json();
         generateMonthOptions();
         renderData();
@@ -40,8 +98,7 @@ async function loadDataFromSheets() {
 
 // 4. Tạo menu chọn tháng
 function generateMonthOptions() {
-    const monthSelect = document.getElementById('monthFilter');
-    if (!monthSelect) return;
+    if (!monthFilter) return;
 
     const months = new Set();
     const now = new Date();
@@ -49,38 +106,36 @@ function generateMonthOptions() {
     
     months.add(currentMonth);
     transactions.forEach(t => {
-        if (t.date) {
-            // Lấy YYYY-MM từ chuỗi ngày
-            months.add(t.date.substring(0, 7).replace(/\//g, '-'));
-        }
+        const monthKey = getMonthKey(t.date);
+        if (monthKey) months.add(monthKey);
     });
 
     const sortedMonths = Array.from(months).sort().reverse();
-    const selectedBefore = monthSelect.value || currentMonth;
+    const selectedBefore = monthFilter.value || currentMonth;
 
-    monthSelect.innerHTML = sortedMonths.map(m => `
-        <option value="${m}" ${m === selectedBefore ? 'selected' : ''}>
-            Tháng ${m.split('-')[1]}/${m.split('-')[0]}
-        </option>
-    `).join('');
+    monthFilter.innerHTML = '';
+    sortedMonths.forEach(month => {
+        const option = document.createElement('option');
+        const [year, monthNumber] = month.split('-');
+
+        option.value = month;
+        option.textContent = `Tháng ${monthNumber}/${year}`;
+        option.selected = month === selectedBefore;
+        monthFilter.appendChild(option);
+    });
 }
 
-// 5. Thêm khoản chi mới (ĐÃ SỬA LỖI NGÀY)
 async function addItem() {
     const payer = document.getElementById('payer').value;
     const category = document.getElementById('category').value;
-    const description = document.getElementById('description').value;
-    const amountRaw = document.getElementById('amount').value.replace(/\./g, '');
-    const amount = parseInt(amountRaw);
-    const dateInput = document.getElementById('date').value;
+    const descriptionInput = document.getElementById('description');
+    const description = descriptionInput.value.trim();
+    const amount = normalizeAmount(amountInput.value);
 
-    if (!description || !amount || !dateInput) {
+    if (!description || amount <= 0 || !dateInput.value) {
         alert("Vui lòng nhập đầy đủ thông tin!");
         return;
     }
-
-    // SỬA TẠI ĐÂY: Dùng dấu / thay vì - để tránh lỗi lùi ngày do múi giờ
-    const formattedDate = dateInput.replace(/-/g, '/');
 
     const item = {
         id: Date.now(),
@@ -88,110 +143,82 @@ async function addItem() {
         category,
         description,
         amount,
-        date: formattedDate 
+        date: dateInput.value.replace(/-/g, '/')
     };
 
-    const btn = document.querySelector("button[onclick='addItem()']");
-    const originalText = btn.innerText;
-    btn.innerText = "Đang gửi...";
-    btn.disabled = true;
+    const originalText = submitBtn.innerText;
+    submitBtn.innerText = "Đang gửi...";
+    submitBtn.disabled = true;
 
     try {
-        await fetch(SCRIPT_URL, {
+        const response = await fetch(SCRIPT_URL, {
             method: "POST",
             body: JSON.stringify(item)
         });
 
-        document.getElementById('description').value = '';
-        document.getElementById('amount').value = '';
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        descriptionInput.value = '';
+        amountInput.value = '';
         await loadDataFromSheets();
     } catch (error) {
         alert("Có lỗi xảy ra khi gửi dữ liệu!");
         console.error(error);
     } finally {
-        btn.innerText = originalText;
-        btn.disabled = false;
+        submitBtn.innerText = originalText;
+        submitBtn.disabled = false;
     }
 }
 
-// 6. Hiển thị dữ liệu lên giao diện (SỬA LỖI ĐỊNH DẠNG NGÀY HIỂN THỊ)
 function renderData() {
     const list = document.getElementById('historyList');
-    const filterMonth = document.getElementById('monthFilter').value; // Dạng YYYY-MM
     if (!list) return;
 
     list.innerHTML = '';
     let totalVani = 0;
     let totalIvy = 0;
 
-    // Lọc theo tháng
     const filteredData = transactions.filter(item => {
-        if (!item.date) return false;
-        // Chuẩn hóa định dạng ngày để lọc tháng chính xác
-        const dateObj = new Date(item.date);
-        if (isNaN(dateObj)) return false;
-        
-        const year = dateObj.getFullYear();
-        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const itemMonth = `${year}-${month}`;
-        return itemMonth === filterMonth;
+        return getMonthKey(item.date) === monthFilter.value;
     });
 
     renderBudgetReport(filteredData);
 
     filteredData.slice().reverse().forEach(item => {
-        if (item.payer === 'Vani') totalVani += item.amount;
-        else totalIvy += item.amount;
-
-        // --- PHẦN SỬA LỖI HIỂN THỊ NGÀY ---
-        let displayDate = "";
-        try {
-            const dateObj = new Date(item.date);
-            // Kiểm tra nếu ngày hợp lệ
-            if (!isNaN(dateObj)) {
-                const d = String(dateObj.getDate()).padStart(2, '0');
-                const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-                const y = dateObj.getFullYear();
-                displayDate = `${d}/${m}/${y}`;
-            } else {
-                displayDate = "N/A"; // Trường hợp không đọc được ngày
-            }
-        } catch (e) {
-            displayDate = "N/A";
-        }
-
+        const amount = normalizeAmount(item.amount);
         const li = document.createElement('li');
-        li.innerHTML = `
-            <span>
-                <small class="date-label">[${displayDate}]</small> 
-                <b>${item.payer} - ${item.category}</b>: ${item.description} 
-                </span>
-            <span class="amt">${item.amount.toLocaleString('vi-VN')}đ</span>
-        `;
+        const details = document.createElement('span');
+        const dateLabel = createTextElement('small', `[${formatDisplayDate(item.date)}] `, 'date-label');
+        const title = createTextElement('b', `${item.payer} - ${item.category}`);
+        const amountEl = createTextElement('span', formatCurrency(amount), 'amt');
+
+        if (item.payer === 'Vani') totalVani += amount;
+        else totalIvy += amount;
+
+        details.append(dateLabel, title, `: ${item.description}`);
+        li.append(details, amountEl);
         list.appendChild(li);
     });
 
-    // Cập nhật bảng tổng kết
-    document.getElementById('grandTotal').innerText = (totalVani + totalIvy).toLocaleString('vi-VN') + 'đ';
-    document.getElementById('vaniTotal').innerText = totalVani.toLocaleString('vi-VN') + 'đ';
-    document.getElementById('ivyTotal').innerText = totalIvy.toLocaleString('vi-VN') + 'đ';
+    document.getElementById('grandTotal').innerText = formatCurrency(totalVani + totalIvy);
+    document.getElementById('vaniTotal').innerText = formatCurrency(totalVani);
+    document.getElementById('ivyTotal').innerText = formatCurrency(totalIvy);
 
     const balance = (totalVani - totalIvy) / 2;
     const statusEl = document.getElementById('balanceStatus');
 
     if (balance > 0) {
-        statusEl.innerText = `➡️ Ivy cần trả Vani: ${Math.abs(balance).toLocaleString('vi-VN')}đ`;
+        statusEl.innerText = `Ivy cần trả Vani: ${formatCurrency(Math.abs(balance))}`;
         statusEl.style.color = "#007bff";
     } else if (balance < 0) {
-        statusEl.innerText = `➡️ Vani cần trả Ivy: ${Math.abs(balance).toLocaleString('vi-VN')}đ`;
+        statusEl.innerText = `Vani cần trả Ivy: ${formatCurrency(Math.abs(balance))}`;
         statusEl.style.color = "#d9534f";
     } else {
-        statusEl.innerText = "🙌 Đang hòa nhau";
+        statusEl.innerText = "Đang hòa nhau";
         statusEl.style.color = "#28a745";
     }
 }
 
-// 7. Báo cáo ngân sách
 function renderBudgetReport(filteredData) {
     const budgetList = document.getElementById('budgetList');
     if (!budgetList) return;
@@ -201,7 +228,7 @@ function renderBudgetReport(filteredData) {
         const budget = CATEGORY_BUDGETS[category];
         const spent = filteredData
             .filter(item => item.category === category)
-            .reduce((sum, item) => sum + item.amount, 0);
+            .reduce((sum, item) => sum + normalizeAmount(item.amount), 0);
 
         const percent = Math.min((spent / budget) * 100, 100);
         let colorClass = 'progress-green';
@@ -209,7 +236,7 @@ function renderBudgetReport(filteredData) {
 
         if (spent >= budget) {
             colorClass = 'progress-red';
-            warning = '⚠️ Vượt định mức';
+            warning = 'Vượt định mức';
         } else if (spent >= budget * 0.8) {
             colorClass = 'progress-yellow';
         }
@@ -218,7 +245,7 @@ function renderBudgetReport(filteredData) {
             <div class="budget-item">
                 <div class="budget-top">
                     <span>${category}</span>
-                    <span>${spent.toLocaleString('vi-VN')} / ${budget.toLocaleString('vi-VN')}đ</span>
+                    <span>${spent.toLocaleString('vi-VN')} / ${formatCurrency(budget)}</span>
                 </div>
                 <div class="progress-bar">
                     <div class="progress-fill ${colorClass}" style="width:${percent}%"></div>
@@ -229,5 +256,4 @@ function renderBudgetReport(filteredData) {
     }
 }
 
-// Khởi chạy app
 loadDataFromSheets();

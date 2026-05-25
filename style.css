@@ -3,6 +3,7 @@ body {
     background: #f0f2f5;
     display: flex;
     justify-content: center;
+    margin: 0;
     padding: 20px;
 }
 
@@ -46,6 +47,7 @@ h2 {
     border: 1px solid #eee;
 }
 
+.budget-card h3,
 .input-section h3,
 .summary-card h3 {
     margin-top: 0;
@@ -134,12 +136,18 @@ ul {
 
 li {
     display: flex;
+    gap: 16px;
     justify-content: space-between;
     padding: 12px;
     border-bottom: 1px solid #f0f0f0;
 }
 
+.date-label {
+    color: #777;
+}
+
 .amt {
+    flex-shrink: 0;
     font-weight: bold;
     color: #444;
 }
@@ -155,7 +163,14 @@ li {
         position: static;
         width: 100%;
     }
-}/* Budget Card */
+
+    li {
+        flex-direction: column;
+        gap: 6px;
+    }
+}
+
+/* Budget Card */
 
 .budget-card {
     background: #fff;
