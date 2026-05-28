@@ -1,4 +1,4 @@
-const CATEGORY_BUDGETS = {
+const DEFAULT_CATEGORY_BUDGETS = {
     "Ăn uống": 3600000,
     "Mèo": 500000,
     "Xăng xe": 300000,
@@ -9,30 +9,65 @@ const CATEGORY_BUDGETS = {
 };
 
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwgbYI51EUJDgjw8-f1oP6K7h_0zIHaPRPFmpV7GI6S88QrDO8rS25uasnSgoJOPPo/exec";
+const BUDGET_STORAGE_KEY = "vani-ivy-category-budgets";
 
 let transactions = [];
+let categoryBudgets = loadSavedBudgets();
+let canMutateTransactions = false;
+let editingTransactionKey = "";
 
+const payerInput = document.getElementById('payer');
+const categoryInput = document.getElementById('category');
+const descriptionInput = document.getElementById('description');
 const amountInput = document.getElementById('amount');
 const dateInput = document.getElementById('date');
 const monthFilter = document.getElementById('monthFilter');
 const submitBtn = document.getElementById('submitBtn');
+const cancelEditBtn = document.getElementById('cancelEditBtn');
+const formTitle = document.getElementById('formTitle');
+const statusMessage = document.getElementById('statusMessage');
+const historyEmpty = document.getElementById('historyEmpty');
+const transactionCount = document.getElementById('transactionCount');
+const budgetToggleBtn = document.getElementById('budgetToggleBtn');
+const budgetEditor = document.getElementById('budgetEditor');
 
 dateInput.valueAsDate = new Date();
 
 amountInput.addEventListener('input', function (e) {
-    let value = e.target.value.replace(/\D/g, '');
-    if (value === '') {
-        e.target.value = '';
-        return;
-    }
-    e.target.value = Number(value).toLocaleString('vi-VN');
+    const value = e.target.value.replace(/\D/g, '');
+    e.target.value = value ? Number(value).toLocaleString('vi-VN') : '';
 });
 
 monthFilter.addEventListener('change', renderData);
-submitBtn.addEventListener('click', addItem);
+submitBtn.addEventListener('click', saveItem);
+cancelEditBtn.addEventListener('click', resetForm);
+budgetToggleBtn.addEventListener('click', toggleBudgetEditor);
+
+function loadSavedBudgets() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(BUDGET_STORAGE_KEY));
+        return { ...DEFAULT_CATEGORY_BUDGETS, ...saved };
+    } catch (error) {
+        return { ...DEFAULT_CATEGORY_BUDGETS };
+    }
+}
+
+function saveBudgets() {
+    localStorage.setItem(BUDGET_STORAGE_KEY, JSON.stringify(categoryBudgets));
+}
 
 function formatCurrency(amount) {
     return Math.round(amount).toLocaleString('vi-VN') + 'đ';
+}
+
+function formatDateInput(value) {
+    const date = parseLocalDate(value);
+    if (!date) return '';
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 function normalizeAmount(value) {
@@ -73,11 +108,31 @@ function formatDisplayDate(value) {
     return `${day}/${month}/${date.getFullYear()}`;
 }
 
+function getTransactionKey(item) {
+    if (item.id) return String(item.id);
+    return [
+        item.date,
+        item.payer,
+        item.category,
+        item.description,
+        normalizeAmount(item.amount)
+    ].join('|');
+}
+
+function findTransaction(key) {
+    return transactions.find(item => getTransactionKey(item) === key);
+}
+
 function createTextElement(tag, text, className) {
     const element = document.createElement(tag);
     element.textContent = text;
     if (className) element.className = className;
     return element;
+}
+
+function setStatus(message, type = '') {
+    statusMessage.textContent = message;
+    statusMessage.className = `status-message ${type}`.trim();
 }
 
 async function loadDataFromSheets() {
@@ -88,22 +143,25 @@ async function loadDataFromSheets() {
         const response = await fetch(SCRIPT_URL);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-        transactions = await response.json();
+        const data = await response.json();
+        transactions = Array.isArray(data) ? data : data.transactions || [];
+        canMutateTransactions = !Array.isArray(data) && data.features?.mutations === true;
+
         generateMonthOptions();
         renderData();
     } catch (error) {
         console.error("Lỗi khi tải dữ liệu:", error);
+        setStatus("Không tải được dữ liệu mới. Đang hiển thị dữ liệu hiện có.", "error");
     }
 }
 
-// 4. Tạo menu chọn tháng
 function generateMonthOptions() {
     if (!monthFilter) return;
 
     const months = new Set();
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    
+
     months.add(currentMonth);
     transactions.forEach(t => {
         const monthKey = getMonthKey(t.date);
@@ -125,48 +183,121 @@ function generateMonthOptions() {
     });
 }
 
-async function addItem() {
-    const payer = document.getElementById('payer').value;
-    const category = document.getElementById('category').value;
-    const descriptionInput = document.getElementById('description');
-    const description = descriptionInput.value.trim();
-    const amount = normalizeAmount(amountInput.value);
+function getFormItem() {
+    return {
+        id: editingTransactionKey && /^\d+$/.test(editingTransactionKey)
+            ? Number(editingTransactionKey)
+            : Date.now(),
+        payer: payerInput.value,
+        category: categoryInput.value,
+        description: descriptionInput.value.trim(),
+        amount: normalizeAmount(amountInput.value),
+        date: dateInput.value.replace(/-/g, '/')
+    };
+}
 
-    if (!description || amount <= 0 || !dateInput.value) {
-        alert("Vui lòng nhập đầy đủ thông tin!");
+async function saveItem() {
+    const item = getFormItem();
+    const isEditing = Boolean(editingTransactionKey);
+
+    if (!item.description || item.amount <= 0 || !dateInput.value) {
+        setStatus("Vui lòng nhập đầy đủ thông tin.", "error");
         return;
     }
 
-    const item = {
-        id: Date.now(),
-        payer,
-        category,
-        description,
-        amount,
-        date: dateInput.value.replace(/-/g, '/')
-    };
+    if (isEditing && !canMutateTransactions) {
+        setStatus("Cần cập nhật Apps Script trước khi sửa khoản chi.", "error");
+        return;
+    }
 
-    const originalText = submitBtn.innerText;
-    submitBtn.innerText = "Đang gửi...";
+    submitBtn.innerText = isEditing ? "Đang cập nhật..." : "Đang gửi...";
     submitBtn.disabled = true;
+    setStatus(isEditing ? "Đang cập nhật khoản chi..." : "Đang lưu khoản chi...");
 
     try {
+        const payload = isEditing
+            ? { action: "update", key: editingTransactionKey, item }
+            : item;
+
         const response = await fetch(SCRIPT_URL, {
             method: "POST",
-            body: JSON.stringify(item)
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-        descriptionInput.value = '';
-        amountInput.value = '';
+        setStatus(isEditing ? "Đã cập nhật khoản chi." : "Đã ghi nhận khoản chi.", "success");
+        resetForm();
         await loadDataFromSheets();
     } catch (error) {
-        alert("Có lỗi xảy ra khi gửi dữ liệu!");
+        setStatus("Có lỗi xảy ra khi gửi dữ liệu.", "error");
         console.error(error);
     } finally {
-        submitBtn.innerText = originalText;
+        submitBtn.innerText = editingTransactionKey ? "Cập nhật" : "Ghi nhận";
         submitBtn.disabled = false;
+    }
+}
+
+function startEdit(key) {
+    if (!canMutateTransactions) {
+        setStatus("Cần cập nhật Apps Script trước khi sửa khoản chi.", "error");
+        return;
+    }
+
+    const item = findTransaction(key);
+    if (!item) return;
+
+    editingTransactionKey = key;
+    payerInput.value = item.payer;
+    categoryInput.value = item.category;
+    descriptionInput.value = item.description;
+    amountInput.value = normalizeAmount(item.amount).toLocaleString('vi-VN');
+    dateInput.value = formatDateInput(item.date);
+    formTitle.innerText = "Sửa khoản chi";
+    submitBtn.innerText = "Cập nhật";
+    cancelEditBtn.hidden = false;
+    setStatus("Đang sửa khoản chi. Bấm cập nhật để lưu.", "");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function resetForm() {
+    editingTransactionKey = "";
+    descriptionInput.value = '';
+    amountInput.value = '';
+    dateInput.valueAsDate = new Date();
+    formTitle.innerText = "Nhập chi tiêu mới";
+    submitBtn.innerText = "Ghi nhận";
+    cancelEditBtn.hidden = true;
+}
+
+async function deleteItem(key) {
+    if (!canMutateTransactions) {
+        setStatus("Cần cập nhật Apps Script trước khi xóa khoản chi.", "error");
+        return;
+    }
+
+    const item = findTransaction(key);
+    if (!item) return;
+
+    const confirmed = confirm(`Xóa khoản "${item.description}"?`);
+    if (!confirmed) return;
+
+    setStatus("Đang xóa khoản chi...");
+
+    try {
+        const response = await fetch(SCRIPT_URL, {
+            method: "POST",
+            body: JSON.stringify({ action: "delete", key, item })
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        setStatus("Đã xóa khoản chi.", "success");
+        if (editingTransactionKey === key) resetForm();
+        await loadDataFromSheets();
+    } catch (error) {
+        setStatus("Có lỗi xảy ra khi xóa dữ liệu.", "error");
+        console.error(error);
     }
 }
 
@@ -182,21 +313,43 @@ function renderData() {
         return getMonthKey(item.date) === monthFilter.value;
     });
 
+    historyEmpty.style.display = filteredData.length ? 'none' : 'block';
+    transactionCount.innerText = `${filteredData.length} khoản`;
+
     renderBudgetReport(filteredData);
 
     filteredData.slice().reverse().forEach(item => {
+        const key = getTransactionKey(item);
         const amount = normalizeAmount(item.amount);
         const li = document.createElement('li');
-        const details = document.createElement('span');
-        const dateLabel = createTextElement('small', `[${formatDisplayDate(item.date)}] `, 'date-label');
-        const title = createTextElement('b', `${item.payer} - ${item.category}`);
+        const details = document.createElement('div');
+        const title = createTextElement('div', item.description, 'transaction-title');
+        const meta = createTextElement(
+            'div',
+            `${formatDisplayDate(item.date)} · ${item.payer} · ${item.category}`,
+            'transaction-meta'
+        );
+        const side = document.createElement('div');
         const amountEl = createTextElement('span', formatCurrency(amount), 'amt');
+        const actions = document.createElement('div');
+        const editButton = createRowButton('Sửa', () => startEdit(key));
+        const deleteButton = createRowButton('Xóa', () => deleteItem(key), 'danger');
 
         if (item.payer === 'Vani') totalVani += amount;
         else totalIvy += amount;
 
-        details.append(dateLabel, title, `: ${item.description}`);
-        li.append(details, amountEl);
+        details.className = 'transaction-main';
+        side.className = 'transaction-side';
+        actions.className = 'transaction-actions';
+        editButton.disabled = !canMutateTransactions;
+        deleteButton.disabled = !canMutateTransactions;
+        editButton.title = canMutateTransactions ? 'Sửa khoản chi' : 'Cần cập nhật Apps Script';
+        deleteButton.title = canMutateTransactions ? 'Xóa khoản chi' : 'Cần cập nhật Apps Script';
+
+        details.append(title, meta);
+        actions.append(editButton, deleteButton);
+        side.append(amountEl, actions);
+        li.append(details, side);
         list.appendChild(li);
     });
 
@@ -209,14 +362,26 @@ function renderData() {
 
     if (balance > 0) {
         statusEl.innerText = `Ivy cần trả Vani: ${formatCurrency(Math.abs(balance))}`;
-        statusEl.style.color = "#007bff";
+        statusEl.style.background = "#eef6ff";
+        statusEl.style.color = "#2563eb";
     } else if (balance < 0) {
         statusEl.innerText = `Vani cần trả Ivy: ${formatCurrency(Math.abs(balance))}`;
-        statusEl.style.color = "#d9534f";
+        statusEl.style.background = "#fff1f1";
+        statusEl.style.color = "#d64545";
     } else {
         statusEl.innerText = "Đang hòa nhau";
-        statusEl.style.color = "#28a745";
+        statusEl.style.background = "#effaf4";
+        statusEl.style.color = "#17704a";
     }
+}
+
+function createRowButton(label, onClick, tone = '') {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.className = `row-action ${tone}`.trim();
+    button.addEventListener('click', onClick);
+    return button;
 }
 
 function renderBudgetReport(filteredData) {
@@ -224,20 +389,20 @@ function renderBudgetReport(filteredData) {
     if (!budgetList) return;
     budgetList.innerHTML = '';
 
-    for (const category in CATEGORY_BUDGETS) {
-        const budget = CATEGORY_BUDGETS[category];
+    for (const category in categoryBudgets) {
+        const budget = categoryBudgets[category];
         const spent = filteredData
             .filter(item => item.category === category)
             .reduce((sum, item) => sum + normalizeAmount(item.amount), 0);
 
-        const percent = Math.min((spent / budget) * 100, 100);
+        const percent = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
         let colorClass = 'progress-green';
         let warning = '';
 
-        if (spent >= budget) {
+        if (budget > 0 && spent >= budget) {
             colorClass = 'progress-red';
             warning = 'Vượt định mức';
-        } else if (spent >= budget * 0.8) {
+        } else if (budget > 0 && spent >= budget * 0.8) {
             colorClass = 'progress-yellow';
         }
 
@@ -254,6 +419,49 @@ function renderBudgetReport(filteredData) {
             </div>
         `;
     }
+}
+
+function toggleBudgetEditor() {
+    budgetEditor.hidden = !budgetEditor.hidden;
+    budgetToggleBtn.innerText = budgetEditor.hidden ? "Chỉnh ngân sách" : "Ẩn chỉnh sửa";
+    if (!budgetEditor.hidden) renderBudgetEditor();
+}
+
+function renderBudgetEditor() {
+    budgetEditor.innerHTML = '';
+
+    for (const category in categoryBudgets) {
+        const label = document.createElement('label');
+        const name = createTextElement('span', category);
+        const input = document.createElement('input');
+
+        label.className = 'budget-field';
+        input.type = 'text';
+        input.inputMode = 'numeric';
+        input.value = categoryBudgets[category].toLocaleString('vi-VN');
+        input.addEventListener('input', event => {
+            const value = event.target.value.replace(/\D/g, '');
+            categoryBudgets[category] = Number(value) || 0;
+            event.target.value = value ? Number(value).toLocaleString('vi-VN') : '';
+            saveBudgets();
+            renderData();
+        });
+
+        label.append(name, input);
+        budgetEditor.appendChild(label);
+    }
+
+    const resetButton = document.createElement('button');
+    resetButton.type = 'button';
+    resetButton.className = 'secondary-button';
+    resetButton.textContent = 'Khôi phục ngân sách mặc định';
+    resetButton.addEventListener('click', () => {
+        categoryBudgets = { ...DEFAULT_CATEGORY_BUDGETS };
+        saveBudgets();
+        renderBudgetEditor();
+        renderData();
+    });
+    budgetEditor.appendChild(resetButton);
 }
 
 loadDataFromSheets();

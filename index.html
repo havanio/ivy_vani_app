@@ -8,8 +8,18 @@
 </head>
 <body>
 
-    <div class="container">
-        <h2>Quản Lý Chi Tiêu Vani & Ivy</h2>
+    <main class="app-shell">
+        <header class="app-header">
+            <div>
+                <p class="eyebrow">Quỹ chung</p>
+                <h1>Chi tiêu Vani & Ivy</h1>
+            </div>
+
+            <div class="month-control">
+                <label for="monthFilter">Tháng</label>
+                <select id="monthFilter"></select>
+            </div>
+        </header>
 
         <div class="main-layout">
 
@@ -17,96 +27,116 @@
             <div class="left-col">
 
                 <div class="input-section">
-                    <h3>Nhập chi tiêu mới</h3>
+                    <div class="form-title">
+                        <h3 id="formTitle">Nhập chi tiêu mới</h3>
+                        <button id="cancelEditBtn" class="text-button" type="button" hidden>Hủy sửa</button>
+                    </div>
 
-                    <select id="payer">
-                        <option value="Vani">Vani thanh toán</option>
-                        <option value="Ivy">Ivy thanh toán</option>
-                    </select>
+                    <div class="field-grid">
+                        <label class="field">
+                            <span>Người thanh toán</span>
+                            <select id="payer">
+                                <option value="Vani">Vani thanh toán</option>
+                                <option value="Ivy">Ivy thanh toán</option>
+                            </select>
+                        </label>
 
-                    <select id="category">
-                        <option value="Ăn uống">Ăn uống</option>
-                        <option value="Mèo">Mèo</option>
-                        <option value="Xăng xe">Xăng xe</option>
-                        <option value="Thiết yếu">Thiết yếu</option>
-                        <option value="Cố định">Cố định</option>
-                        <option value="Ăn ngoài">Ăn ngoài</option>
-                        <option value="Khác">Khác</option>
-                    </select>
+                        <label class="field">
+                            <span>Danh mục</span>
+                            <select id="category">
+                                <option value="Ăn uống">Ăn uống</option>
+                                <option value="Mèo">Mèo</option>
+                                <option value="Xăng xe">Xăng xe</option>
+                                <option value="Thiết yếu">Thiết yếu</option>
+                                <option value="Cố định">Cố định</option>
+                                <option value="Ăn ngoài">Ăn ngoài</option>
+                                <option value="Khác">Khác</option>
+                            </select>
+                        </label>
+                    </div>
 
-                    <input 
-                        type="text" 
-                        id="description" 
-                        placeholder="Nội dung chi tiêu"
-                    >
+                    <label class="field">
+                        <span>Nội dung</span>
+                        <input 
+                            type="text" 
+                            id="description" 
+                            placeholder="Ví dụ: Coopmart, tiền điện..."
+                            autocomplete="off"
+                        >
+                    </label>
 
-                    <input 
-                        type="text" 
-                        id="amount" 
-                        placeholder="Ví dụ: 120.000"
-                    >
+                    <div class="field-grid">
+                        <label class="field">
+                            <span>Số tiền</span>
+                            <input 
+                                type="text" 
+                                id="amount" 
+                                placeholder="120.000"
+                                inputmode="numeric"
+                                autocomplete="off"
+                            >
+                        </label>
 
-                    <input type="date" id="date">
+                        <label class="field">
+                            <span>Ngày</span>
+                            <input type="date" id="date">
+                        </label>
+                    </div>
 
                     <button id="submitBtn" type="button">Ghi nhận</button>
+                    <p id="statusMessage" class="status-message" aria-live="polite"></p>
                 </div>
 
             </div>
 
             <!-- RIGHT -->
             <div class="right-col">
-                <div class="budget-card">
-                    <h3>Báo cáo danh mục</h3>
-
-                    <div id="budgetList"></div>
-                </div>
-
                 <div class="summary-card">
                     <h3>Báo cáo chi tiêu</h3>
 
-                    <div class="filter-section">
-                        <label>Chọn tháng:</label>
-
-                        <select id="monthFilter"></select>
+                    <div class="metrics-grid">
+                        <div class="metric">
+                            <span>Tổng tháng</span>
+                            <strong id="grandTotal">0đ</strong>
+                        </div>
+                        <div class="metric">
+                            <span>Vani đã chi</span>
+                            <strong id="vaniTotal">0đ</strong>
+                        </div>
+                        <div class="metric">
+                            <span>Ivy đã chi</span>
+                            <strong id="ivyTotal">0đ</strong>
+                        </div>
                     </div>
 
-                    <table class="summary-table">
+                    <div id="balanceStatus" class="balance-pill">Đang hòa nhau</div>
+                </div>
 
-                        <tr>
-                            <td>Tổng chi tiêu tháng:</td>
-                            <td id="grandTotal" class="bold">0</td>
-                        </tr>
+                <div class="budget-card">
+                    <div class="card-title">
+                        <h3>Báo cáo danh mục</h3>
+                        <button id="budgetToggleBtn" class="text-button" type="button">Chỉnh ngân sách</button>
+                    </div>
 
-                        <tr>
-                            <td>Vani đã chi:</td>
-                            <td id="vaniTotal">0</td>
-                        </tr>
-
-                        <tr>
-                            <td>Ivy đã chi:</td>
-                            <td id="ivyTotal">0</td>
-                        </tr>
-
-                        <tr class="highlight-row">
-                            <td colspan="2" id="balanceStatus">
-                                Đang hòa nhau
-                            </td>
-                        </tr>
-
-                    </table>
+                    <div id="budgetList"></div>
+                    <div id="budgetEditor" class="budget-editor" hidden></div>
                 </div>
 
             </div>
 
         </div>
 
-        <hr>
+        <section class="history-section">
+            <div class="section-title">
+                <h3>Lịch sử chi tiêu</h3>
+                <span id="transactionCount">0 khoản</span>
+            </div>
 
-        <h3>Lịch sử chi tiêu</h3>
+            <p id="historyEmpty" class="empty-state">Chưa có khoản chi nào trong tháng này.</p>
+            <ul id="historyList"></ul>
+        </section>
 
-        <ul id="historyList"></ul>
-
-    </div>
+    </main>
 
     <script src="script.js"></script>
 
