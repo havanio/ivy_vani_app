@@ -4,7 +4,7 @@ Static GitHub Pages app for tracking shared expenses.
 
 ## Enable Edit/Delete
 
-The frontend already has edit/delete buttons, but they stay disabled until the Google Apps Script backend supports row updates.
+The frontend has edit/delete buttons, but they need the Google Apps Script backend in this repo.
 
 To enable them:
 
@@ -14,4 +14,7 @@ To enable them:
 4. Keep the same access setting you already use.
 5. Refresh the app.
 
-Budget editing works immediately in the browser and is saved with `localStorage`.
+After the updated script is deployed:
+
+- Edit/delete buttons become active.
+- Budget limits stay in `script.js`, so you can change them in code when needed.

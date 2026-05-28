@@ -1,4 +1,4 @@
-const DEFAULT_CATEGORY_BUDGETS = {
+const CATEGORY_BUDGETS = {
     "Ăn uống": 3600000,
     "Mèo": 500000,
     "Xăng xe": 300000,
@@ -9,10 +9,8 @@ const DEFAULT_CATEGORY_BUDGETS = {
 };
 
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwgbYI51EUJDgjw8-f1oP6K7h_0zIHaPRPFmpV7GI6S88QrDO8rS25uasnSgoJOPPo/exec";
-const BUDGET_STORAGE_KEY = "vani-ivy-category-budgets";
 
 let transactions = [];
-let categoryBudgets = loadSavedBudgets();
 let canMutateTransactions = false;
 let editingTransactionKey = "";
 
@@ -28,8 +26,6 @@ const formTitle = document.getElementById('formTitle');
 const statusMessage = document.getElementById('statusMessage');
 const historyEmpty = document.getElementById('historyEmpty');
 const transactionCount = document.getElementById('transactionCount');
-const budgetToggleBtn = document.getElementById('budgetToggleBtn');
-const budgetEditor = document.getElementById('budgetEditor');
 
 dateInput.valueAsDate = new Date();
 
@@ -41,20 +37,6 @@ amountInput.addEventListener('input', function (e) {
 monthFilter.addEventListener('change', renderData);
 submitBtn.addEventListener('click', saveItem);
 cancelEditBtn.addEventListener('click', resetForm);
-budgetToggleBtn.addEventListener('click', toggleBudgetEditor);
-
-function loadSavedBudgets() {
-    try {
-        const saved = JSON.parse(localStorage.getItem(BUDGET_STORAGE_KEY));
-        return { ...DEFAULT_CATEGORY_BUDGETS, ...saved };
-    } catch (error) {
-        return { ...DEFAULT_CATEGORY_BUDGETS };
-    }
-}
-
-function saveBudgets() {
-    localStorage.setItem(BUDGET_STORAGE_KEY, JSON.stringify(categoryBudgets));
-}
 
 function formatCurrency(amount) {
     return Math.round(amount).toLocaleString('vi-VN') + 'đ';
@@ -389,8 +371,8 @@ function renderBudgetReport(filteredData) {
     if (!budgetList) return;
     budgetList.innerHTML = '';
 
-    for (const category in categoryBudgets) {
-        const budget = categoryBudgets[category];
+    for (const category in CATEGORY_BUDGETS) {
+        const budget = CATEGORY_BUDGETS[category];
         const spent = filteredData
             .filter(item => item.category === category)
             .reduce((sum, item) => sum + normalizeAmount(item.amount), 0);
@@ -419,49 +401,6 @@ function renderBudgetReport(filteredData) {
             </div>
         `;
     }
-}
-
-function toggleBudgetEditor() {
-    budgetEditor.hidden = !budgetEditor.hidden;
-    budgetToggleBtn.innerText = budgetEditor.hidden ? "Chỉnh ngân sách" : "Ẩn chỉnh sửa";
-    if (!budgetEditor.hidden) renderBudgetEditor();
-}
-
-function renderBudgetEditor() {
-    budgetEditor.innerHTML = '';
-
-    for (const category in categoryBudgets) {
-        const label = document.createElement('label');
-        const name = createTextElement('span', category);
-        const input = document.createElement('input');
-
-        label.className = 'budget-field';
-        input.type = 'text';
-        input.inputMode = 'numeric';
-        input.value = categoryBudgets[category].toLocaleString('vi-VN');
-        input.addEventListener('input', event => {
-            const value = event.target.value.replace(/\D/g, '');
-            categoryBudgets[category] = Number(value) || 0;
-            event.target.value = value ? Number(value).toLocaleString('vi-VN') : '';
-            saveBudgets();
-            renderData();
-        });
-
-        label.append(name, input);
-        budgetEditor.appendChild(label);
-    }
-
-    const resetButton = document.createElement('button');
-    resetButton.type = 'button';
-    resetButton.className = 'secondary-button';
-    resetButton.textContent = 'Khôi phục ngân sách mặc định';
-    resetButton.addEventListener('click', () => {
-        categoryBudgets = { ...DEFAULT_CATEGORY_BUDGETS };
-        saveBudgets();
-        renderBudgetEditor();
-        renderData();
-    });
-    budgetEditor.appendChild(resetButton);
 }
 
 loadDataFromSheets();

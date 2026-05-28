@@ -36,7 +36,7 @@ function getSheet() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = SHEET_NAME
     ? spreadsheet.getSheetByName(SHEET_NAME)
-    : spreadsheet.getSheets()[0];
+    : findTransactionSheet(spreadsheet);
 
   if (!sheet) {
     throw new Error("Sheet not found");
@@ -44,6 +44,19 @@ function getSheet() {
 
   ensureHeaders(sheet);
   return sheet;
+}
+
+function findTransactionSheet(spreadsheet) {
+  const sheets = spreadsheet.getSheets();
+  const transactionSheet = sheets.find(sheet => {
+    const lastColumn = Math.max(sheet.getLastColumn(), 1);
+    const firstRow = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(normalizeHeader);
+    return firstRow.includes("payer") || firstRow.includes("category") || firstRow.includes("amount");
+  });
+
+  if (transactionSheet) return transactionSheet;
+
+  return sheets[0] || null;
 }
 
 function ensureHeaders(sheet) {
