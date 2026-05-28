@@ -3,7 +3,7 @@ const CATEGORY_BUDGETS = {
     "Mèo": 500000,
     "Xăng xe": 300000,
     "Thiết yếu": 300000,
-    "Cố định": 5500000,
+    "Cố định": 1500000,
     "Ăn ngoài": 1200000,
     "Khác": 1200000
 };
