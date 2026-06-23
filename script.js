@@ -413,12 +413,14 @@ function renderData() {
     filteredData.slice().reverse().forEach(item => {
         const key = getTransactionKey(item);
         const amount = normalizeAmount(item.amount);
+        const payerClass = getPayerClass(item.payer);
         const li = document.createElement('li');
         const details = document.createElement('div');
         const titleRow = document.createElement('div');
-        const payerTag = createTextElement('span', formatPayerLabel(item.payer), `payer-tag ${getPayerClass(item.payer)}`);
+        const payerTag = createTextElement('span', formatPayerLabel(item.payer), `payer-tag ${payerClass}`);
         const separator = createTextElement('span', ' - ', 'transaction-separator');
         const title = createTextElement('span', item.description, 'transaction-title');
+        const infoRow = document.createElement('div');
         const meta = createTextElement(
             'div',
             `${formatDisplayDate(item.date)} · ${item.category}`,
@@ -433,8 +435,10 @@ function renderData() {
         if (item.payer === 'Vani') totalVani += amount;
         else totalIvy += amount;
 
+        li.className = `transaction-item ${payerClass}`;
         details.className = 'transaction-main';
         titleRow.className = 'transaction-title-row';
+        infoRow.className = 'transaction-info-row';
         side.className = 'transaction-side';
         actions.className = 'transaction-actions';
         editButton.disabled = !canMutateTransactions;
@@ -443,9 +447,10 @@ function renderData() {
         deleteButton.title = canMutateTransactions ? 'Xóa khoản chi' : 'Cần cập nhật Apps Script';
 
         titleRow.append(payerTag, separator, title);
-        details.append(titleRow, meta);
+        infoRow.append(meta, amountEl);
+        details.append(titleRow, infoRow);
         actions.append(editButton, deleteButton);
-        side.append(amountEl, actions);
+        side.append(actions);
         li.append(details, side);
         list.appendChild(li);
     });

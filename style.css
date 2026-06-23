@@ -431,6 +431,13 @@ li:last-child {
     font-size: 13px;
 }
 
+.transaction-info-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
 .transaction-side {
     display: grid;
     gap: 6px;
@@ -506,16 +513,61 @@ li:last-child {
 
     li {
         grid-template-columns: 1fr;
-        gap: 8px;
+        gap: 6px;
+        padding: 16px 0 16px 12px;
+    }
+
+    .transaction-item {
+        border-left: 3px solid transparent;
+    }
+
+    .transaction-item.ivy {
+        border-left-color: #bfdbfe;
+    }
+
+    .transaction-item.vani {
+        border-left-color: #fbcfe8;
     }
 
     .transaction-side {
-        justify-items: start;
+        justify-items: end;
+        gap: 8px;
     }
 
     .transaction-title-row {
-        align-items: center;
-        flex-direction: row;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .transaction-title {
+        flex: 1 1 0;
+    }
+
+    .transaction-separator {
+        display: none;
+    }
+
+    .payer-tag {
+        min-width: 44px;
+        padding: 2px 8px;
+    }
+
+    .transaction-meta {
+        font-size: 12px;
+    }
+
+    .transaction-info-row {
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .amt {
+        font-size: 16px;
+        text-align: right;
+    }
+
+    .transaction-actions {
+        justify-content: flex-end;
     }
 
 }
