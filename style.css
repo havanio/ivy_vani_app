@@ -388,12 +388,15 @@ li:last-child {
 .transaction-title-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0;
     min-width: 0;
+    flex-wrap: wrap;
 }
 
 .transaction-title {
     font-weight: 800;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .payer-tag {
@@ -415,6 +418,12 @@ li:last-child {
 .payer-tag.vani {
     background: #ffe9f2;
     color: #be185d;
+}
+
+.transaction-separator {
+    flex-shrink: 0;
+    color: var(--muted);
+    white-space: pre;
 }
 
 .transaction-meta {
@@ -505,8 +514,8 @@ li:last-child {
     }
 
     .transaction-title-row {
-        align-items: flex-start;
-        flex-direction: column;
+        align-items: center;
+        flex-direction: row;
     }
 
 }

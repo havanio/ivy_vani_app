@@ -126,6 +126,10 @@ function getPayerClass(payer) {
     return String(payer).trim().toLowerCase() === 'ivy' ? 'ivy' : 'vani';
 }
 
+function formatPayerLabel(payer) {
+    return String(payer || '').trim() || 'N/A';
+}
+
 function getScriptUrl() {
     return SCRIPT_URL;
 }
@@ -412,7 +416,8 @@ function renderData() {
         const li = document.createElement('li');
         const details = document.createElement('div');
         const titleRow = document.createElement('div');
-        const payerTag = createTextElement('span', item.payer, `payer-tag ${getPayerClass(item.payer)}`);
+        const payerTag = createTextElement('span', formatPayerLabel(item.payer), `payer-tag ${getPayerClass(item.payer)}`);
+        const separator = createTextElement('span', ' - ', 'transaction-separator');
         const title = createTextElement('span', item.description, 'transaction-title');
         const meta = createTextElement(
             'div',
@@ -437,7 +442,7 @@ function renderData() {
         editButton.title = canMutateTransactions ? 'Sửa khoản chi' : 'Cần cập nhật Apps Script';
         deleteButton.title = canMutateTransactions ? 'Xóa khoản chi' : 'Cần cập nhật Apps Script';
 
-        titleRow.append(payerTag, title);
+        titleRow.append(payerTag, separator, title);
         details.append(titleRow, meta);
         actions.append(editButton, deleteButton);
         side.append(amountEl, actions);
