@@ -9,12 +9,15 @@ const CATEGORY_BUDGETS = {
 };
 
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwgbYI51EUJDgjw8-f1oP6K7h_0zIHaPRPFmpV7GI6S88QrDO8rS25uasnSgoJOPPo/exec";
-const TRANSACTIONS_CACHE_KEY = "vani-ivy-transactions-cache";
+const TRANSACTIONS_CACHE_PREFIX = "vani-ivy-transactions-cache";
+const MONTHS_CACHE_KEY = "vani-ivy-months-cache";
 
 let transactions = [];
+let availableMonths = [];
 let canMutateTransactions = false;
 let editingTransactionKey = "";
 let isLoadingTransactions = false;
+let latestLoadRequestId = 0;
 
 const payerInput = document.getElementById('payer');
 const categoryInput = document.getElementById('category');
@@ -36,7 +39,7 @@ amountInput.addEventListener('input', function (e) {
     e.target.value = value ? Number(value).toLocaleString('vi-VN') : '';
 });
 
-monthFilter.addEventListener('change', renderData);
+monthFilter.addEventListener('change', handleMonthChange);
 submitBtn.addEventListener('click', saveItem);
 cancelEditBtn.addEventListener('click', resetForm);
 
@@ -124,13 +127,21 @@ function getPayerClass(payer) {
 }
 
 function getScriptUrl() {
-    const separator = SCRIPT_URL.includes('?') ? '&' : '?';
-    return `${SCRIPT_URL}${separator}t=${Date.now()}`;
+    return SCRIPT_URL;
 }
 
-function loadCachedTransactions() {
+function getCurrentMonthKey() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getCacheKey(monthKey) {
+    return `${TRANSACTIONS_CACHE_PREFIX}-${monthKey}`;
+}
+
+function loadCachedTransactions(monthKey) {
     try {
-        const cached = JSON.parse(localStorage.getItem(TRANSACTIONS_CACHE_KEY));
+        const cached = JSON.parse(localStorage.getItem(getCacheKey(monthKey)));
         if (!Array.isArray(cached)) return [];
         return cached;
     } catch (error) {
@@ -138,16 +149,34 @@ function loadCachedTransactions() {
     }
 }
 
-function saveCachedTransactions(items) {
-    localStorage.setItem(TRANSACTIONS_CACHE_KEY, JSON.stringify(items));
+function saveCachedTransactions(monthKey, items) {
+    localStorage.setItem(getCacheKey(monthKey), JSON.stringify(items));
 }
 
-async function fetchTransactionsWithRetry(attempts = 3) {
+function loadCachedMonths() {
+    try {
+        const cached = JSON.parse(localStorage.getItem(MONTHS_CACHE_KEY));
+        if (!Array.isArray(cached)) return [];
+        return cached;
+    } catch (error) {
+        return [];
+    }
+}
+
+function saveCachedMonths(months) {
+    localStorage.setItem(MONTHS_CACHE_KEY, JSON.stringify(months));
+}
+
+async function fetchTransactionsWithRetry(monthKey, attempts = 3) {
     let lastError = null;
 
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
         try {
-            const response = await fetch(getScriptUrl(), { cache: 'no-store' });
+            const url = new URL(getScriptUrl());
+            url.searchParams.set('month', monthKey);
+            url.searchParams.set('t', Date.now());
+
+            const response = await fetch(url, { cache: 'no-store' });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
             const data = await response.json();
@@ -163,25 +192,35 @@ async function fetchTransactionsWithRetry(attempts = 3) {
     throw lastError;
 }
 
-async function loadDataFromSheets() {
-    if (!transactions.length) {
-        transactions = loadCachedTransactions();
+async function loadDataFromSheets(selectedMonth = monthFilter.value || getCurrentMonthKey()) {
+    const requestId = ++latestLoadRequestId;
+
+    if (!availableMonths.length) {
+        availableMonths = loadCachedMonths();
     }
 
+    transactions = loadCachedTransactions(selectedMonth);
+
     isLoadingTransactions = true;
-    generateMonthOptions();
+    generateMonthOptions(selectedMonth);
     renderData();
 
     try {
-        const data = await fetchTransactionsWithRetry();
+        const data = await fetchTransactionsWithRetry(selectedMonth);
+        if (requestId !== latestLoadRequestId) return;
+
         transactions = Array.isArray(data) ? data : data.transactions || [];
+        availableMonths = Array.isArray(data) ? [selectedMonth] : data.months || [];
         canMutateTransactions = !Array.isArray(data) && data.features?.mutations === true;
-        saveCachedTransactions(transactions);
+        saveCachedTransactions(selectedMonth, transactions);
+        saveCachedMonths(availableMonths);
         setStatus("", "");
 
-        generateMonthOptions();
+        generateMonthOptions(selectedMonth);
         renderData();
     } catch (error) {
+        if (requestId !== latestLoadRequestId) return;
+
         console.error("Lỗi khi tải dữ liệu:", error);
         setStatus(
             transactions.length
@@ -190,26 +229,26 @@ async function loadDataFromSheets() {
             "error"
         );
     } finally {
+        if (requestId !== latestLoadRequestId) return;
+
         isLoadingTransactions = false;
         renderData();
     }
 }
 
-function generateMonthOptions() {
+function generateMonthOptions(selectedMonth = monthFilter.value || getCurrentMonthKey()) {
     if (!monthFilter) return;
 
     const months = new Set();
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const currentMonth = getCurrentMonthKey();
 
     months.add(currentMonth);
-    transactions.forEach(t => {
-        const monthKey = getMonthKey(t.date);
-        if (monthKey) months.add(monthKey);
+    availableMonths.forEach(month => {
+        if (month) months.add(month);
     });
 
     const sortedMonths = Array.from(months).sort().reverse();
-    const selectedBefore = monthFilter.value || currentMonth;
+    const selectedBefore = selectedMonth || currentMonth;
 
     monthFilter.innerHTML = '';
     sortedMonths.forEach(month => {
@@ -221,6 +260,10 @@ function generateMonthOptions() {
         option.selected = month === selectedBefore;
         monthFilter.appendChild(option);
     });
+}
+
+function handleMonthChange() {
+    loadDataFromSheets(monthFilter.value);
 }
 
 function getFormItem() {
@@ -268,7 +311,7 @@ async function saveItem() {
 
         setStatus(isEditing ? "Đã cập nhật khoản chi." : "Đã ghi nhận khoản chi.", "success");
         resetForm();
-        await loadDataFromSheets();
+        await loadDataFromSheets(monthFilter.value || getMonthKey(item.date));
     } catch (error) {
         setStatus("Có lỗi xảy ra khi gửi dữ liệu.", "error");
         console.error(error);
@@ -334,7 +377,7 @@ async function deleteItem(key) {
 
         setStatus("Đã xóa khoản chi.", "success");
         if (editingTransactionKey === key) resetForm();
-        await loadDataFromSheets();
+        await loadDataFromSheets(monthFilter.value || getCurrentMonthKey());
     } catch (error) {
         setStatus("Có lỗi xảy ra khi xóa dữ liệu.", "error");
         console.error(error);

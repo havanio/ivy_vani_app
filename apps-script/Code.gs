@@ -1,14 +1,16 @@
 const SHEET_NAME = "";
 const HEADERS = ["id", "payer", "category", "description", "amount", "date"];
 
-function doGet() {
+function doGet(e) {
+  const monthFilter = normalizeMonthParam(e && e.parameter ? e.parameter.month : "");
   const sheet = getSheet();
-  const rows = getRows(sheet);
+  const rows = getRows(sheet, monthFilter);
 
   return jsonResponse({
     features: {
       mutations: true
     },
+    months: rows.months,
     transactions: rows.transactions
   });
 }
@@ -77,10 +79,11 @@ function ensureHeaders(sheet) {
   });
 }
 
-function getRows(sheet) {
+function getRows(sheet, monthFilter) {
   const values = sheet.getDataRange().getValues();
   const headers = values[0].map(normalizeHeader);
   const transactions = [];
+  const months = {};
 
   for (let index = 1; index < values.length; index++) {
     const row = values[index];
@@ -98,10 +101,22 @@ function getRows(sheet) {
 
     transaction.amount = Number(transaction.amount) || 0;
     transaction.date = formatDate(transaction.date);
-    transactions.push({ ...transaction, rowNumber: index + 1 });
+    const monthKey = getMonthKey(transaction.date);
+
+    if (monthKey) {
+      months[monthKey] = true;
+    }
+
+    if (!monthFilter || monthKey === monthFilter) {
+      transactions.push({ ...transaction, rowNumber: index + 1 });
+    }
   }
 
-  return { headers, transactions };
+  return {
+    headers,
+    months: Object.keys(months).sort().reverse(),
+    transactions
+  };
 }
 
 function appendTransaction(sheet, item) {
@@ -181,6 +196,21 @@ function formatDate(value) {
   }
 
   return String(value || "").replace(/-/g, "/");
+}
+
+function getMonthKey(value) {
+  const normalized = String(value || "").replace(/\//g, "-");
+  const match = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!match) return "";
+
+  const year = match[1];
+  const month = ("0" + match[2]).slice(-2);
+  return year + "-" + month;
+}
+
+function normalizeMonthParam(value) {
+  const normalized = String(value || "").trim();
+  return /^\d{4}-\d{2}$/.test(normalized) ? normalized : "";
 }
 
 function jsonResponse(data) {

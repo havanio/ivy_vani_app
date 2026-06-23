@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "local": "npx serve . -l 7002"
+  }
+}
