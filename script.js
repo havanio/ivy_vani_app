@@ -9,10 +9,12 @@ const CATEGORY_BUDGETS = {
 };
 
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwgbYI51EUJDgjw8-f1oP6K7h_0zIHaPRPFmpV7GI6S88QrDO8rS25uasnSgoJOPPo/exec";
+const TRANSACTIONS_CACHE_KEY = "vani-ivy-transactions-cache";
 
 let transactions = [];
 let canMutateTransactions = false;
 let editingTransactionKey = "";
+let isLoadingTransactions = false;
 
 const payerInput = document.getElementById('payer');
 const categoryInput = document.getElementById('category');
@@ -117,23 +119,79 @@ function setStatus(message, type = '') {
     statusMessage.className = `status-message ${type}`.trim();
 }
 
+function getPayerClass(payer) {
+    return String(payer).trim().toLowerCase() === 'ivy' ? 'ivy' : 'vani';
+}
+
+function getScriptUrl() {
+    const separator = SCRIPT_URL.includes('?') ? '&' : '?';
+    return `${SCRIPT_URL}${separator}t=${Date.now()}`;
+}
+
+function loadCachedTransactions() {
+    try {
+        const cached = JSON.parse(localStorage.getItem(TRANSACTIONS_CACHE_KEY));
+        if (!Array.isArray(cached)) return [];
+        return cached;
+    } catch (error) {
+        return [];
+    }
+}
+
+function saveCachedTransactions(items) {
+    localStorage.setItem(TRANSACTIONS_CACHE_KEY, JSON.stringify(items));
+}
+
+async function fetchTransactionsWithRetry(attempts = 3) {
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        try {
+            const response = await fetch(getScriptUrl(), { cache: 'no-store' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            lastError = error;
+            if (attempt < attempts) {
+                await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+            }
+        }
+    }
+
+    throw lastError;
+}
+
 async function loadDataFromSheets() {
+    if (!transactions.length) {
+        transactions = loadCachedTransactions();
+    }
+
+    isLoadingTransactions = true;
     generateMonthOptions();
     renderData();
 
     try {
-        const response = await fetch(SCRIPT_URL);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-        const data = await response.json();
+        const data = await fetchTransactionsWithRetry();
         transactions = Array.isArray(data) ? data : data.transactions || [];
         canMutateTransactions = !Array.isArray(data) && data.features?.mutations === true;
+        saveCachedTransactions(transactions);
+        setStatus("", "");
 
         generateMonthOptions();
         renderData();
     } catch (error) {
         console.error("Lỗi khi tải dữ liệu:", error);
-        setStatus("Không tải được dữ liệu mới. Đang hiển thị dữ liệu hiện có.", "error");
+        setStatus(
+            transactions.length
+                ? "Không tải được dữ liệu mới. Đang hiển thị dữ liệu gần nhất."
+                : "Không tải được dữ liệu từ Google Sheets.",
+            "error"
+        );
+    } finally {
+        isLoadingTransactions = false;
+        renderData();
     }
 }
 
@@ -295,8 +353,13 @@ function renderData() {
         return getMonthKey(item.date) === monthFilter.value;
     });
 
-    historyEmpty.style.display = filteredData.length ? 'none' : 'block';
-    transactionCount.innerText = `${filteredData.length} khoản`;
+    historyEmpty.textContent = isLoadingTransactions
+        ? "Đang tải dữ liệu..."
+        : "Chưa có khoản chi nào trong tháng này.";
+    historyEmpty.style.display = !filteredData.length ? 'block' : 'none';
+    transactionCount.innerText = isLoadingTransactions && !filteredData.length
+        ? "Đang tải"
+        : `${filteredData.length} khoản`;
 
     renderBudgetReport(filteredData);
 
@@ -305,10 +368,12 @@ function renderData() {
         const amount = normalizeAmount(item.amount);
         const li = document.createElement('li');
         const details = document.createElement('div');
-        const title = createTextElement('div', item.description, 'transaction-title');
+        const titleRow = document.createElement('div');
+        const payerTag = createTextElement('span', item.payer, `payer-tag ${getPayerClass(item.payer)}`);
+        const title = createTextElement('span', item.description, 'transaction-title');
         const meta = createTextElement(
             'div',
-            `${formatDisplayDate(item.date)} · ${item.payer} · ${item.category}`,
+            `${formatDisplayDate(item.date)} · ${item.category}`,
             'transaction-meta'
         );
         const side = document.createElement('div');
@@ -321,6 +386,7 @@ function renderData() {
         else totalIvy += amount;
 
         details.className = 'transaction-main';
+        titleRow.className = 'transaction-title-row';
         side.className = 'transaction-side';
         actions.className = 'transaction-actions';
         editButton.disabled = !canMutateTransactions;
@@ -328,7 +394,8 @@ function renderData() {
         editButton.title = canMutateTransactions ? 'Sửa khoản chi' : 'Cần cập nhật Apps Script';
         deleteButton.title = canMutateTransactions ? 'Xóa khoản chi' : 'Cần cập nhật Apps Script';
 
-        details.append(title, meta);
+        titleRow.append(payerTag, title);
+        details.append(titleRow, meta);
         actions.append(editButton, deleteButton);
         side.append(amountEl, actions);
         li.append(details, side);
