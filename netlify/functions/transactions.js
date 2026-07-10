@@ -1,6 +1,5 @@
 import { neon } from "@neondatabase/serverless";
 
-const TABLE_NAME = "transactions";
 const ALLOWED_ORIGIN = "*";
 
 function json(statusCode, data) {
@@ -87,7 +86,7 @@ async function listTransactions(sql, monthFilter) {
         description,
         amount,
         to_char(date, 'YYYY-MM-DD') AS date
-      FROM ${sql.unsafe(TABLE_NAME)}
+      FROM transactions
       WHERE date >= ${monthBounds(monthFilter).start}::date
         AND date < ${monthBounds(monthFilter).end}::date
       ORDER BY date DESC, created_at DESC
@@ -100,13 +99,13 @@ async function listTransactions(sql, monthFilter) {
         description,
         amount,
         to_char(date, 'YYYY-MM-DD') AS date
-      FROM ${sql.unsafe(TABLE_NAME)}
+      FROM transactions
       ORDER BY date DESC, created_at DESC
     `;
 
   const monthsRows = await sql`
     SELECT DISTINCT to_char(date, 'YYYY-MM') AS month
-    FROM ${sql.unsafe(TABLE_NAME)}
+    FROM transactions
     ORDER BY month DESC
   `;
 
@@ -128,7 +127,7 @@ async function createTransaction(sql, body) {
 
   const id = crypto.randomUUID();
   const rows = await sql`
-    INSERT INTO ${sql.unsafe(TABLE_NAME)} (id, payer, category, description, amount, date)
+    INSERT INTO transactions (id, payer, category, description, amount, date)
     VALUES (${id}, ${item.payer}, ${item.category}, ${item.description}, ${item.amount}, ${item.date}::date)
     RETURNING
       id,
@@ -155,7 +154,7 @@ async function updateTransaction(sql, body) {
   }
 
   const rows = await sql`
-    UPDATE ${sql.unsafe(TABLE_NAME)}
+    UPDATE transactions
     SET
       payer = ${item.payer},
       category = ${item.category},
@@ -187,7 +186,7 @@ async function deleteTransaction(sql, body) {
   }
 
   const rows = await sql`
-    DELETE FROM ${sql.unsafe(TABLE_NAME)}
+    DELETE FROM transactions
     WHERE id = ${id}
     RETURNING id
   `;
