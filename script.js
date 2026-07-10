@@ -8,7 +8,7 @@ const CATEGORY_BUDGETS = {
     "Khác": 1200000
 };
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwgbYI51EUJDgjw8-f1oP6K7h_0zIHaPRPFmpV7GI6S88QrDO8rS25uasnSgoJOPPo/exec";
+const API_URL = "/api/transactions";
 const TRANSACTIONS_CACHE_PREFIX = "vani-ivy-transactions-cache";
 const MONTHS_CACHE_KEY = "vani-ivy-months-cache";
 
@@ -131,7 +131,7 @@ function formatPayerLabel(payer) {
 }
 
 function getScriptUrl() {
-    return SCRIPT_URL;
+    return API_URL;
 }
 
 function getCurrentMonthKey() {
@@ -196,7 +196,7 @@ async function fetchTransactionsWithRetry(monthKey, attempts = 3) {
     throw lastError;
 }
 
-async function loadDataFromSheets(selectedMonth = monthFilter.value || getCurrentMonthKey()) {
+async function loadDataFromApi(selectedMonth = monthFilter.value || getCurrentMonthKey()) {
     const requestId = ++latestLoadRequestId;
 
     if (!availableMonths.length) {
@@ -229,7 +229,7 @@ async function loadDataFromSheets(selectedMonth = monthFilter.value || getCurren
         setStatus(
             transactions.length
                 ? "Không tải được dữ liệu mới. Đang hiển thị dữ liệu gần nhất."
-                : "Không tải được dữ liệu từ Google Sheets.",
+                : "Không tải được dữ liệu từ hệ thống lưu trữ.",
             "error"
         );
     } finally {
@@ -267,20 +267,23 @@ function generateMonthOptions(selectedMonth = monthFilter.value || getCurrentMon
 }
 
 function handleMonthChange() {
-    loadDataFromSheets(monthFilter.value);
+    loadDataFromApi(monthFilter.value);
 }
 
 function getFormItem() {
-    return {
-        id: editingTransactionKey && /^\d+$/.test(editingTransactionKey)
-            ? Number(editingTransactionKey)
-            : Date.now(),
+    const item = {
         payer: payerInput.value,
         category: categoryInput.value,
         description: descriptionInput.value.trim(),
         amount: normalizeAmount(amountInput.value),
         date: dateInput.value.replace(/-/g, '/')
     };
+
+    if (editingTransactionKey) {
+        item.id = editingTransactionKey;
+    }
+
+    return item;
 }
 
 async function saveItem() {
@@ -293,7 +296,7 @@ async function saveItem() {
     }
 
     if (isEditing && !canMutateTransactions) {
-        setStatus("Cần cập nhật Apps Script trước khi sửa khoản chi.", "error");
+        setStatus("Cần bật backend mới trước khi sửa khoản chi.", "error");
         return;
     }
 
@@ -302,20 +305,19 @@ async function saveItem() {
     setStatus(isEditing ? "Đang cập nhật khoản chi..." : "Đang lưu khoản chi...");
 
     try {
-        const payload = isEditing
-            ? { action: "update", key: editingTransactionKey, item }
-            : item;
-
-        const response = await fetch(SCRIPT_URL, {
-            method: "POST",
-            body: JSON.stringify(payload)
+        const response = await fetch(getScriptUrl(), {
+            method: isEditing ? "PATCH" : "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(isEditing ? { key: editingTransactionKey, item } : item)
         });
 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         setStatus(isEditing ? "Đã cập nhật khoản chi." : "Đã ghi nhận khoản chi.", "success");
         resetForm();
-        await loadDataFromSheets(monthFilter.value || getMonthKey(item.date));
+        await loadDataFromApi(monthFilter.value || getMonthKey(item.date));
     } catch (error) {
         setStatus("Có lỗi xảy ra khi gửi dữ liệu.", "error");
         console.error(error);
@@ -327,7 +329,7 @@ async function saveItem() {
 
 function startEdit(key) {
     if (!canMutateTransactions) {
-        setStatus("Cần cập nhật Apps Script trước khi sửa khoản chi.", "error");
+        setStatus("Cần bật backend mới trước khi sửa khoản chi.", "error");
         return;
     }
 
@@ -359,7 +361,7 @@ function resetForm() {
 
 async function deleteItem(key) {
     if (!canMutateTransactions) {
-        setStatus("Cần cập nhật Apps Script trước khi xóa khoản chi.", "error");
+        setStatus("Cần bật backend mới trước khi xóa khoản chi.", "error");
         return;
     }
 
@@ -372,16 +374,19 @@ async function deleteItem(key) {
     setStatus("Đang xóa khoản chi...");
 
     try {
-        const response = await fetch(SCRIPT_URL, {
-            method: "POST",
-            body: JSON.stringify({ action: "delete", key, item })
+        const response = await fetch(getScriptUrl(), {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ key, item })
         });
 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         setStatus("Đã xóa khoản chi.", "success");
         if (editingTransactionKey === key) resetForm();
-        await loadDataFromSheets(monthFilter.value || getCurrentMonthKey());
+        await loadDataFromApi(monthFilter.value || getCurrentMonthKey());
     } catch (error) {
         setStatus("Có lỗi xảy ra khi xóa dữ liệu.", "error");
         console.error(error);
@@ -443,8 +448,8 @@ function renderData() {
         actions.className = 'transaction-actions';
         editButton.disabled = !canMutateTransactions;
         deleteButton.disabled = !canMutateTransactions;
-        editButton.title = canMutateTransactions ? 'Sửa khoản chi' : 'Cần cập nhật Apps Script';
-        deleteButton.title = canMutateTransactions ? 'Xóa khoản chi' : 'Cần cập nhật Apps Script';
+        editButton.title = canMutateTransactions ? 'Sửa khoản chi' : 'Cần bật backend mới';
+        deleteButton.title = canMutateTransactions ? 'Xóa khoản chi' : 'Cần bật backend mới';
 
         titleRow.append(payerTag, separator, title);
         infoRow.append(meta, amountEl);
@@ -523,4 +528,4 @@ function renderBudgetReport(filteredData) {
     }
 }
 
-loadDataFromSheets();
+loadDataFromApi();
