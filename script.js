@@ -176,7 +176,7 @@ async function fetchTransactionsWithRetry(monthKey, attempts = 3) {
 
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
         try {
-            const url = new URL(getScriptUrl());
+            const url = new URL(getScriptUrl(), window.location.origin);
             url.searchParams.set('month', monthKey);
             url.searchParams.set('t', Date.now());
 
