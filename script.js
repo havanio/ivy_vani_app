@@ -8,7 +8,11 @@ const CATEGORY_BUDGETS = {
     "Khác": 1200000
 };
 
-const API_URL = "/api/transactions";
+const API_ORIGIN = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname) ||
+    window.location.hostname.endsWith("github.io")
+    ? "https://vanivy.netlify.app"
+    : window.location.origin;
+const API_URL = new URL("/api/transactions", API_ORIGIN).toString();
 const TRANSACTIONS_CACHE_PREFIX = "vani-ivy-transactions-cache";
 const MONTHS_CACHE_KEY = "vani-ivy-months-cache";
 
@@ -415,7 +419,7 @@ function renderData() {
 
     renderBudgetReport(filteredData);
 
-    filteredData.slice().reverse().forEach(item => {
+    filteredData.forEach(item => {
         const key = getTransactionKey(item);
         const amount = normalizeAmount(item.amount);
         const payerClass = getPayerClass(item.payer);
