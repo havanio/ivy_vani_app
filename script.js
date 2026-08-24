@@ -26,6 +26,7 @@ let latestLoadRequestId = 0;
 const payerInput = document.getElementById('payer');
 const categoryInput = document.getElementById('category');
 const descriptionInput = document.getElementById('description');
+const sourceInput = document.getElementById('source');
 const amountInput = document.getElementById('amount');
 const dateInput = document.getElementById('date');
 const monthFilter = document.getElementById('monthFilter');
@@ -279,6 +280,7 @@ function getFormItem() {
         payer: payerInput.value,
         category: categoryInput.value,
         description: descriptionInput.value.trim(),
+        source: sourceInput.value,
         amount: normalizeAmount(amountInput.value),
         date: dateInput.value.replace(/-/g, '/')
     };
@@ -344,6 +346,7 @@ function startEdit(key) {
     payerInput.value = item.payer;
     categoryInput.value = item.category;
     descriptionInput.value = item.description;
+    sourceInput.value = item.source || "";
     amountInput.value = normalizeAmount(item.amount).toLocaleString('vi-VN');
     dateInput.value = formatDateInput(item.date);
     formTitle.innerText = "Sửa khoản chi";
@@ -356,6 +359,7 @@ function startEdit(key) {
 function resetForm() {
     editingTransactionKey = "";
     descriptionInput.value = '';
+    sourceInput.value = '';
     amountInput.value = '';
     dateInput.valueAsDate = new Date();
     formTitle.innerText = "Nhập chi tiêu mới";

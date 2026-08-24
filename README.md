@@ -17,6 +17,7 @@ The main table is `transactions` with these fields:
 - `payer`
 - `category`
 - `description`
+- `source`
 - `amount`
 - `date`
 

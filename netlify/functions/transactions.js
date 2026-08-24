@@ -1,6 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 
 const ALLOWED_ORIGIN = "*";
+let schemaReadyPromise;
 
 function json(statusCode, data) {
   return new Response(JSON.stringify(data), {
@@ -23,6 +24,17 @@ function getSql() {
   return neon(connectionString);
 }
 
+function ensureSchema(sql) {
+  if (!schemaReadyPromise) {
+    schemaReadyPromise = sql`
+      ALTER TABLE transactions
+      ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT ''
+    `;
+  }
+
+  return schemaReadyPromise;
+}
+
 function normalizeMonthParam(value) {
   const normalized = String(value || "").trim();
   return /^\d{4}-\d{2}$/.test(normalized) ? normalized : "";
@@ -42,6 +54,7 @@ function normalizeItem(item = {}) {
   const amount = Number(item.amount) || 0;
   const payer = String(item.payer || "").trim();
   const category = String(item.category || "").trim();
+  const source = String(item.source || "").trim();
   const date = String(item.date || "").trim().replace(/\//g, "-");
 
   return {
@@ -49,15 +62,18 @@ function normalizeItem(item = {}) {
     payer,
     category,
     description,
+    source,
     amount,
     date
   };
 }
 
 function validateItem(item) {
+  const allowedSources = ["", "Cash", "Card", "Banking", "Momo"];
   if (!item.payer) return "payer is required";
   if (!item.category) return "category is required";
   if (!item.description) return "description is required";
+  if (!allowedSources.includes(item.source)) return "source is invalid";
   if (!Number.isFinite(item.amount) || item.amount <= 0) return "amount must be greater than 0";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(item.date)) return "date must be YYYY-MM-DD";
   return "";
@@ -84,6 +100,7 @@ async function listTransactions(sql, monthFilter) {
         payer,
         category,
         description,
+        source,
         amount,
         to_char(date, 'YYYY-MM-DD') AS date
       FROM transactions
@@ -97,6 +114,7 @@ async function listTransactions(sql, monthFilter) {
         payer,
         category,
         description,
+        source,
         amount,
         to_char(date, 'YYYY-MM-DD') AS date
       FROM transactions
@@ -127,13 +145,14 @@ async function createTransaction(sql, body) {
 
   const id = crypto.randomUUID();
   const rows = await sql`
-    INSERT INTO transactions (id, payer, category, description, amount, date)
-    VALUES (${id}, ${item.payer}, ${item.category}, ${item.description}, ${item.amount}, ${item.date}::date)
+    INSERT INTO transactions (id, payer, category, description, source, amount, date)
+    VALUES (${id}, ${item.payer}, ${item.category}, ${item.description}, ${item.source}, ${item.amount}, ${item.date}::date)
     RETURNING
       id,
       payer,
       category,
       description,
+      source,
       amount,
       to_char(date, 'YYYY-MM-DD') AS date
   `;
@@ -159,6 +178,7 @@ async function updateTransaction(sql, body) {
       payer = ${item.payer},
       category = ${item.category},
       description = ${item.description},
+      source = ${item.source},
       amount = ${item.amount},
       date = ${item.date}::date,
       updated_at = now()
@@ -168,6 +188,7 @@ async function updateTransaction(sql, body) {
       payer,
       category,
       description,
+      source,
       amount,
       to_char(date, 'YYYY-MM-DD') AS date
   `;
@@ -205,6 +226,7 @@ export default async function handler(req) {
 
   try {
     const sql = getSql();
+    await ensureSchema(sql);
     const url = new URL(req.url);
     const body = req.method === "GET" || req.method === "HEAD" ? {} : parseBody(await req.text());
     const action = String(body.action || "").trim().toLowerCase();

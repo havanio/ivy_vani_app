@@ -57,15 +57,28 @@
                         </label>
                     </div>
 
-                    <label class="field">
-                        <span>Nội dung</span>
-                        <input 
-                            type="text" 
-                            id="description" 
-                            placeholder="Ví dụ: Coopmart, tiền điện..."
-                            autocomplete="off"
-                        >
-                    </label>
+                    <div class="field-grid">
+                        <label class="field">
+                            <span>Nội dung</span>
+                            <input 
+                                type="text" 
+                                id="description" 
+                                placeholder="Ví dụ: Coopmart, tiền điện..."
+                                autocomplete="off"
+                            >
+                        </label>
+
+                        <label class="field">
+                            <span>Nguồn tiền</span>
+                            <select id="source">
+                                <option value=""></option>
+                                <option value="Cash">Cash</option>
+                                <option value="Card">Card</option>
+                                <option value="Banking">Banking</option>
+                                <option value="Momo">Momo</option>
+                            </select>
+                        </label>
+                    </div>
 
                     <div class="field-grid">
                         <label class="field">

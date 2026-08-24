@@ -1,5 +1,5 @@
 const SHEET_NAME = "";
-const HEADERS = ["id", "payer", "category", "description", "amount", "date"];
+const HEADERS = ["id", "payer", "category", "description", "source", "amount", "date"];
 
 function doGet(e) {
   const monthFilter = normalizeMonthParam(e && e.parameter ? e.parameter.month : "");
@@ -164,6 +164,7 @@ function normalizeTransaction(item) {
     payer: item.payer || "",
     category: item.category || "",
     description: item.description || "",
+    source: item.source || "",
     amount: Number(item.amount) || 0,
     date: String(item.date || "").replace(/-/g, "/")
   };
