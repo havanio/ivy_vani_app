@@ -135,6 +135,14 @@ function formatPayerLabel(payer) {
     return String(payer || '').trim() || 'N/A';
 }
 
+function formatTransactionMeta(item) {
+    return [
+        formatDisplayDate(item.date),
+        item.category,
+        item.source
+    ].filter(Boolean).join(' · ');
+}
+
 function getScriptUrl() {
     return API_URL;
 }
@@ -436,7 +444,7 @@ function renderData() {
         const infoRow = document.createElement('div');
         const meta = createTextElement(
             'div',
-            `${formatDisplayDate(item.date)} · ${item.category}`,
+            formatTransactionMeta(item),
             'transaction-meta'
         );
         const side = document.createElement('div');
