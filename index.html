@@ -23,6 +23,13 @@
             </div>
         </header>
 
+        <nav class="view-tabs" aria-label="Chuyển màn hình">
+            <button class="view-tab active" type="button" data-view="overview" aria-selected="true">Tổng quan</button>
+            <button class="view-tab" type="button" data-view="comparison" aria-selected="false">So sánh tháng</button>
+        </nav>
+
+        <div id="overviewView" class="app-view">
+
         <div class="main-layout">
 
             <!-- LEFT -->
@@ -48,7 +55,6 @@
                             <select id="category">
                                 <option value="Ăn uống">Ăn uống</option>
                                 <option value="Mèo">Mèo</option>
-                                <option value="Xăng xe">Xăng xe</option>
                                 <option value="Thiết yếu">Thiết yếu</option>
                                 <option value="Cố định">Cố định</option>
                                 <option value="Ăn ngoài">Ăn ngoài</option>
@@ -122,6 +128,21 @@
                             <span>Ivy đã chi</span>
                             <strong id="ivyTotal">0đ</strong>
                         </div>
+                        <div class="metric insight-metric">
+                            <span>Còn được chi</span>
+                            <strong id="remainingBudget">0đ</strong>
+                            <small id="remainingBudgetHint">Theo tổng định mức</small>
+                        </div>
+                        <div class="metric insight-metric">
+                            <span>Tốc độ chi</span>
+                            <strong id="spendingPace">0%</strong>
+                            <small id="spendingPaceHint">Đang tính...</small>
+                        </div>
+                        <div class="metric insight-metric">
+                            <span>Dự báo cuối tháng</span>
+                            <strong id="monthForecast">0đ</strong>
+                            <small id="monthForecastHint">Theo tốc độ hiện tại</small>
+                        </div>
                     </div>
 
                     <div id="balanceStatus" class="balance-pill">Đang hòa nhau</div>
@@ -145,6 +166,71 @@
 
             <p id="historyEmpty" class="empty-state">Chưa có khoản chi nào trong tháng này.</p>
             <ul id="historyList"></ul>
+        </section>
+
+        </div>
+
+        <section id="comparisonView" class="app-view comparison-view" hidden>
+            <div class="comparison-heading">
+                <div>
+                    <p class="eyebrow">Phân tích chi tiêu</p>
+                    <h2>So sánh theo tháng</h2>
+                    <p class="comparison-subtitle">Đối chiếu từng danh mục để thấy khoản nào đang tăng hoặc giảm.</p>
+                </div>
+                <label class="period-control" for="comparisonPeriod">
+                    <span>Khoảng thời gian</span>
+                    <select id="comparisonPeriod">
+                        <option value="3">3 tháng gần nhất</option>
+                        <option value="6" selected>6 tháng gần nhất</option>
+                        <option value="12">12 tháng gần nhất</option>
+                    </select>
+                </label>
+            </div>
+
+            <p id="comparisonStatus" class="comparison-status" aria-live="polite">Đang tải dữ liệu so sánh...</p>
+
+            <div id="comparisonContent" hidden>
+                <div class="comparison-metrics">
+                    <article class="comparison-metric">
+                        <span>Tháng gần nhất</span>
+                        <strong id="comparisonLatestTotal">0đ</strong>
+                        <small id="comparisonLatestLabel">—</small>
+                    </article>
+                    <article class="comparison-metric">
+                        <span>So với tháng trước</span>
+                        <strong id="comparisonChange">—</strong>
+                        <small id="comparisonChangeHint">Chưa đủ dữ liệu</small>
+                    </article>
+                    <article class="comparison-metric">
+                        <span>Trung bình / tháng</span>
+                        <strong id="comparisonAverage">0đ</strong>
+                        <small id="comparisonAverageHint">Trong kỳ đang xem</small>
+                    </article>
+                </div>
+
+                <div class="trend-card">
+                    <div class="section-title">
+                        <h3>Xu hướng tổng chi</h3>
+                        <span>Đơn vị: triệu đồng</span>
+                    </div>
+                    <div id="trendChart" class="trend-chart"></div>
+                </div>
+
+                <div class="comparison-table-card">
+                    <div class="section-title comparison-table-title">
+                        <div>
+                            <h3>Chi tiết theo danh mục</h3>
+                            <p>Cột cuối so sánh tháng gần nhất với định mức. Ô có ⚠ là đã vượt định mức tháng.</p>
+                        </div>
+                    </div>
+                    <div class="table-scroll">
+                        <table class="comparison-table">
+                            <thead id="comparisonTableHead"></thead>
+                            <tbody id="comparisonTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </section>
 
     </main>

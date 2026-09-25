@@ -1,9 +1,8 @@
 const CATEGORY_BUDGETS = {
     "Ăn uống": 3600000,
     "Mèo": 500000,
-    "Xăng xe": 300000,
     "Thiết yếu": 300000,
-    "Cố định": 1500000,
+    "Cố định": 1700000,
     "Ăn ngoài": 1200000,
     "Khác": 1200000
 };
@@ -22,6 +21,8 @@ let canMutateTransactions = false;
 let editingTransactionKey = "";
 let isLoadingTransactions = false;
 let latestLoadRequestId = 0;
+let comparisonTransactions = [];
+let comparisonLoaded = false;
 
 const payerInput = document.getElementById('payer');
 const categoryInput = document.getElementById('category');
@@ -36,6 +37,8 @@ const formTitle = document.getElementById('formTitle');
 const statusMessage = document.getElementById('statusMessage');
 const historyEmpty = document.getElementById('historyEmpty');
 const transactionCount = document.getElementById('transactionCount');
+const viewTabs = document.querySelectorAll('.view-tab');
+const comparisonPeriod = document.getElementById('comparisonPeriod');
 
 dateInput.valueAsDate = new Date();
 
@@ -47,6 +50,132 @@ amountInput.addEventListener('input', function (e) {
 monthFilter.addEventListener('change', handleMonthChange);
 submitBtn.addEventListener('click', saveItem);
 cancelEditBtn.addEventListener('click', resetForm);
+viewTabs.forEach(tab => tab.addEventListener('click', () => switchView(tab.dataset.view)));
+comparisonPeriod.addEventListener('change', renderComparison);
+
+function switchView(view) {
+    const isComparison = view === 'comparison';
+    document.getElementById('overviewView').hidden = isComparison;
+    document.getElementById('comparisonView').hidden = !isComparison;
+    document.querySelector('.month-control').hidden = isComparison;
+    viewTabs.forEach(tab => {
+        const active = tab.dataset.view === view;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', String(active));
+    });
+    if (isComparison && !comparisonLoaded) loadComparisonData();
+}
+
+async function loadComparisonData() {
+    const status = document.getElementById('comparisonStatus');
+    status.hidden = false;
+    status.className = 'comparison-status';
+    status.textContent = 'Đang tải dữ liệu so sánh...';
+
+    try {
+        const url = new URL(getScriptUrl(), window.location.origin);
+        url.searchParams.set('t', Date.now());
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        comparisonTransactions = Array.isArray(data) ? data : data.transactions || [];
+        comparisonLoaded = true;
+        status.hidden = true;
+        document.getElementById('comparisonContent').hidden = false;
+        renderComparison();
+    } catch (error) {
+        console.error('Lỗi khi tải dữ liệu so sánh:', error);
+        status.className = 'comparison-status error';
+        status.textContent = 'Không tải được dữ liệu so sánh. Vui lòng thử lại sau.';
+    }
+}
+
+function formatMonthShort(monthKey) {
+    const [year, month] = monthKey.split('-');
+    return `T${Number(month)}/${year}`;
+}
+
+function getMonthlyComparisonData() {
+    const grouped = {};
+    comparisonTransactions.forEach(item => {
+        const month = getMonthKey(item.date);
+        if (!month) return;
+        if (!grouped[month]) grouped[month] = { total: 0, categories: {} };
+        const amount = normalizeAmount(item.amount);
+        grouped[month].total += amount;
+        grouped[month].categories[item.category] = (grouped[month].categories[item.category] || 0) + amount;
+    });
+    const count = Number(comparisonPeriod.value) || 6;
+    return Object.keys(grouped).sort().slice(-count).map(month => ({ month, ...grouped[month] }));
+}
+
+function formatChange(current, previous) {
+    if (!previous) return current ? 'Mới' : '—';
+    const percent = ((current - previous) / previous) * 100;
+    if (Math.abs(percent) < 0.05) return '0%';
+    return `${percent > 0 ? '+' : ''}${Math.round(percent)}%`;
+}
+
+function changeClass(current, previous) {
+    if (current > previous) return 'change-up';
+    if (current < previous) return 'change-down';
+    return 'change-flat';
+}
+
+function renderComparison() {
+    if (!comparisonLoaded) return;
+    const months = getMonthlyComparisonData();
+    const latest = months.at(-1);
+    const previous = months.at(-2);
+    if (!latest) {
+        document.getElementById('comparisonContent').hidden = true;
+        const status = document.getElementById('comparisonStatus');
+        status.hidden = false;
+        status.textContent = 'Chưa có dữ liệu để so sánh.';
+        return;
+    }
+
+    document.getElementById('comparisonLatestTotal').textContent = formatCurrency(latest.total);
+    document.getElementById('comparisonLatestLabel').textContent = formatMonthShort(latest.month);
+    const changeEl = document.getElementById('comparisonChange');
+    changeEl.textContent = previous ? formatChange(latest.total, previous.total) : '—';
+    changeEl.className = previous ? changeClass(latest.total, previous.total) : '';
+    document.getElementById('comparisonChangeHint').textContent = previous ? `so với ${formatMonthShort(previous.month)}` : 'Chưa đủ dữ liệu';
+    const average = months.reduce((sum, item) => sum + item.total, 0) / months.length;
+    document.getElementById('comparisonAverage').textContent = formatCurrency(average);
+    document.getElementById('comparisonAverageHint').textContent = `Trong ${months.length} tháng có dữ liệu`;
+
+    const maxTotal = Math.max(...months.map(item => item.total), 1);
+    const chart = document.getElementById('trendChart');
+    chart.innerHTML = months.map(item => `
+        <div class="trend-column">
+            <div class="trend-bar-wrap"><div class="trend-bar" style="height:${Math.max((item.total / maxTotal) * 100, 4)}%" title="${formatCurrency(item.total)}"></div></div>
+            <span class="trend-value">${(item.total / 1000000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}</span>
+            <span class="trend-label">${formatMonthShort(item.month)}</span>
+        </div>
+    `).join('');
+
+    const categories = Object.keys(CATEGORY_BUDGETS);
+    document.getElementById('comparisonTableHead').innerHTML = `<tr><th>Danh mục</th><th>Định mức</th>${months.map(item => `<th>${formatMonthShort(item.month)}</th>`).join('')}<th>So với định mức</th></tr>`;
+    const rows = categories.map(category => {
+        const values = months.map(item => item.categories[category] || 0);
+        const current = values.at(-1) || 0;
+        const budget = CATEGORY_BUDGETS[category] || 0;
+        const valueCells = values.map(value => {
+            const isOverBudget = budget > 0 && value > budget;
+            const overAmount = value - budget;
+            const warning = isOverBudget
+                ? `<span class="budget-warning" aria-label="Vượt định mức ${formatCurrency(overAmount)}" title="Vượt định mức ${formatCurrency(overAmount)}">⚠</span>`
+                : '';
+            return `<td class="${isOverBudget ? 'over-budget' : ''}">${formatCurrency(value)}${warning}</td>`;
+        }).join('');
+        return `<tr><td>${category}</td><td class="budget-limit">${budget ? formatCurrency(budget) : '—'}</td>${valueCells}<td class="${changeClass(current, budget)}">${budget ? formatChange(current, budget) : '—'}</td></tr>`;
+    });
+    const totalValues = months.map(item => item.total);
+    const totalBudget = Object.values(CATEGORY_BUDGETS).reduce((sum, value) => sum + value, 0);
+    rows.push(`<tr class="total-row"><td>Tổng chi</td><td>${formatCurrency(totalBudget)}</td>${totalValues.map(value => `<td>${formatCurrency(value)}</td>`).join('')}<td class="${changeClass(latest.total, totalBudget)}">${formatChange(latest.total, totalBudget)}</td></tr>`);
+    document.getElementById('comparisonTableBody').innerHTML = rows.join('');
+}
 
 function formatCurrency(amount) {
     return Math.round(amount).toLocaleString('vi-VN') + 'đ';
@@ -479,6 +608,7 @@ function renderData() {
     document.getElementById('grandTotal').innerText = formatCurrency(totalVani + totalIvy);
     document.getElementById('vaniTotal').innerText = formatCurrency(totalVani);
     document.getElementById('ivyTotal').innerText = formatCurrency(totalIvy);
+    renderMonthlyInsights(totalVani + totalIvy);
 
     const balance = (totalVani - totalIvy) / 2;
     const statusEl = document.getElementById('balanceStatus');
@@ -496,6 +626,50 @@ function renderData() {
         statusEl.style.background = "#effaf4";
         statusEl.style.color = "#17704a";
     }
+}
+
+function renderMonthlyInsights(totalSpent) {
+    const totalBudget = Object.values(CATEGORY_BUDGETS).reduce((sum, value) => sum + value, 0);
+    const remaining = totalBudget - totalSpent;
+    const remainingEl = document.getElementById('remainingBudget');
+    const paceEl = document.getElementById('spendingPace');
+    const forecastEl = document.getElementById('monthForecast');
+    const selectedMonth = monthFilter.value || getCurrentMonthKey();
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const now = new Date();
+    const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
+    const selectedEnd = new Date(year, month, 0);
+    const isPastMonth = selectedEnd < new Date(now.getFullYear(), now.getMonth(), 1);
+    const daysInMonth = selectedEnd.getDate();
+    const elapsedDays = isCurrentMonth ? now.getDate() : (isPastMonth ? daysInMonth : 0);
+    const elapsedPercent = daysInMonth ? (elapsedDays / daysInMonth) * 100 : 0;
+    const budgetPercent = totalBudget ? (totalSpent / totalBudget) * 100 : 0;
+    const forecast = isCurrentMonth && elapsedDays > 0
+        ? (totalSpent / elapsedDays) * daysInMonth
+        : totalSpent;
+    const paceDifference = budgetPercent - elapsedPercent;
+
+    remainingEl.textContent = formatCurrency(Math.abs(remaining));
+    remainingEl.className = remaining < 0 ? 'metric-danger' : 'metric-good';
+    document.getElementById('remainingBudgetHint').textContent = remaining < 0
+        ? `Đã vượt ${formatCurrency(Math.abs(remaining))}`
+        : `Trên tổng ${formatCurrency(totalBudget)}`;
+
+    paceEl.textContent = `${Math.round(budgetPercent)}%`;
+    paceEl.className = paceDifference > 5 ? 'metric-danger' : 'metric-good';
+    document.getElementById('spendingPaceHint').textContent = isCurrentMonth
+        ? (paceDifference > 5
+            ? `Nhanh hơn tiến độ ${Math.round(paceDifference)} điểm %`
+            : `Đã qua ${Math.round(elapsedPercent)}% số ngày`)
+        : (isPastMonth ? 'Mức sử dụng ngân sách' : 'Tháng chưa bắt đầu');
+
+    forecastEl.textContent = formatCurrency(forecast);
+    forecastEl.className = forecast > totalBudget ? 'metric-danger' : 'metric-good';
+    document.getElementById('monthForecastHint').textContent = isCurrentMonth
+        ? (forecast > totalBudget
+            ? `Có thể vượt ${formatCurrency(forecast - totalBudget)}`
+            : `Dự kiến còn ${formatCurrency(totalBudget - forecast)}`)
+        : (isPastMonth ? 'Số thực tế cuối tháng' : 'Chưa có dự báo');
 }
 
 function createRowButton(label, onClick, tone = '') {
